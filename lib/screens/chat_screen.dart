@@ -1,10 +1,10 @@
-import 'dart:convert';
+//import 'dart:convert';
 
 import 'package:flutter/material.dart';
 import 'package:flash_chat/constants.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:modal_progress_hud_nsn/modal_progress_hud_nsn.dart';
-import 'package:flash_chat/screens/welcome_screen.dart';
+//import 'package:flash_chat/screens/welcome_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class ChatScreen extends StatefulWidget {
@@ -43,10 +43,11 @@ class _ChatScreenState extends State<ChatScreen> {
 
   void messagesStream() async {
     await for (var snapshot in _firestore.collection('messages').snapshots()) {
-      print('Got a streamed message');
       for (var message in snapshot.docs) {
         var data = message.data();
-        print(data.toString());
+        final mySender = data['sender'];
+        final myText = data['text'];
+        print('Sender = $mySender and Text = $myText');
       }
     }
   }
@@ -83,6 +84,33 @@ class _ChatScreenState extends State<ChatScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
+              StreamBuilder<QuerySnapshot>(
+                  stream: _firestore.collection('messages').snapshots(),
+                  builder: (context, snapshot) {
+                    if (snapshot.hasData) {
+                      final messages = snapshot.data.docs;
+                      print(messages.length);
+                      List<Text> messageWidgets = [];
+                      for (var message in messages) {
+                        final messageText = message['text'];
+                        final messageSender = message['sender'];
+                        final messageWidget = Text('$messageText from $messageSender');
+                        messageWidgets.add(messageWidget);
+                      }
+                      messageWidgets.add(Text('End of Message'));
+                      print(messageWidgets.length);
+                      return Column(
+                        children: messageWidgets,
+                      );
+                    } else {
+                      print('No data found in snapshot');
+                      return Center(
+                          child: CircularProgressIndicator(
+                        backgroundColor: Colors.lightBlueAccent,
+                        strokeWidth: 10,
+                      ));
+                    }
+                  }),
               Container(
                 decoration: kMessageContainerDecoration,
                 child: Row(
