@@ -4,8 +4,12 @@ import 'package:flutter/material.dart';
 import 'package:flash_chat/constants.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:modal_progress_hud_nsn/modal_progress_hud_nsn.dart';
-//import 'package:flash_chat/screens/welcome_screen.dart';
+import 'package:flash_chat/screens/welcome_screen.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flash_chat/components/message_bubble.dart';
+
+final _firestore = FirebaseFirestore.instance;
+User loggedInUser;
 
 class ChatScreen extends StatefulWidget {
   static String id = 'chat_screen';
@@ -14,10 +18,9 @@ class ChatScreen extends StatefulWidget {
 }
 
 class _ChatScreenState extends State<ChatScreen> {
+  final messageTextController = TextEditingController();
   final _auth = FirebaseAuth.instance;
-  final _firestore = FirebaseFirestore.instance;
   bool showSpinner = false;
-  User loggedInUser;
   String messageText;
   @override
   void initState() {
@@ -64,13 +67,13 @@ class _ChatScreenState extends State<ChatScreen> {
                 setState(() {
                   this.showSpinner = true;
                 });
-//                _auth.signOut();
+                _auth.signOut();
                 print('B4 messagesStream');
                 messagesStream();
                 setState(() {
                   this.showSpinner = false;
                 });
-//                Navigator.pushNamed(context, WelcomeScreen.id);
+                Navigator.pushNamed(context, WelcomeScreen.id);
               }),
         ],
         title: Text('⚡️Chat'),
@@ -84,33 +87,7 @@ class _ChatScreenState extends State<ChatScreen> {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
-              StreamBuilder<QuerySnapshot>(
-                  stream: _firestore.collection('messages').snapshots(),
-                  builder: (context, snapshot) {
-                    if (snapshot.hasData) {
-                      final messages = snapshot.data.docs;
-                      print(messages.length);
-                      List<Text> messageWidgets = [];
-                      for (var message in messages) {
-                        final messageText = message['text'];
-                        final messageSender = message['sender'];
-                        final messageWidget = Text('$messageText from $messageSender');
-                        messageWidgets.add(messageWidget);
-                      }
-                      messageWidgets.add(Text('End of Message'));
-                      print(messageWidgets.length);
-                      return Column(
-                        children: messageWidgets,
-                      );
-                    } else {
-                      print('No data found in snapshot');
-                      return Center(
-                          child: CircularProgressIndicator(
-                        backgroundColor: Colors.lightBlueAccent,
-                        strokeWidth: 10,
-                      ));
-                    }
-                  }),
+              MessagesStream(),
               Container(
                 decoration: kMessageContainerDecoration,
                 child: Row(
@@ -118,6 +95,7 @@ class _ChatScreenState extends State<ChatScreen> {
                   children: <Widget>[
                     Expanded(
                       child: TextField(
+                        controller: messageTextController,
                         onChanged: (value) {
                           messageText = value;
                           print(messageText);
@@ -127,7 +105,7 @@ class _ChatScreenState extends State<ChatScreen> {
                     ),
                     FlatButton(
                       onPressed: () {
-                        print('onPressed');
+                        messageTextController.clear();
                         try {
                           _firestore.collection('messages').add({
                             'text': messageText,
@@ -150,5 +128,51 @@ class _ChatScreenState extends State<ChatScreen> {
         ),
       ),
     );
+  }
+}
+
+class MessagesStream extends StatelessWidget {
+  @override
+  Widget build(BuildContext context) {
+    bool isMe = false;
+    return StreamBuilder<QuerySnapshot>(
+        stream: _firestore.collection('messages').snapshots(),
+        builder: (context, snapshot) {
+          if (snapshot.hasData) {
+            final messages = snapshot.data.docs;
+            print(messages.length);
+            List<MessageBubble> messageBubbles = [];
+            for (var message in messages) {
+              final String messageText = message['text'];
+              final String messageSender = message['sender'];
+              final currentUser = loggedInUser.email;
+              if (currentUser == messageSender) {
+                isMe = true;
+              } else {
+                isMe = false;
+              }
+              if (!isMe) {}
+              print('Current User is $currentUser');
+              final messageBubble = MessageBubble(inSender: messageSender, inText: messageText, isMe: isMe);
+              messageBubbles.add(
+                messageBubble,
+              );
+            }
+            return Expanded(
+              child: ListView(
+                reverse: true,
+                padding: EdgeInsets.symmetric(horizontal: 10.0, vertical: 20.0),
+                children: messageBubbles,
+              ),
+            );
+          } else {
+            print('No data found in snapshot');
+            return Center(
+                child: CircularProgressIndicator(
+              backgroundColor: Colors.lightBlueAccent,
+              strokeWidth: 10,
+            ));
+          }
+        });
   }
 }
